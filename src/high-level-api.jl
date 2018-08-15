@@ -349,13 +349,23 @@ Read a single Byte from the specified port and return it represented as `T`.
 `T` might be either `Char or `UInt8`. if no Byte is availible in the port
 buffer return zero.
 """
-function Base.read(sp::SerialPort, readType::Type{Char})
-    nbytes_read, bytes = sp_nonblocking_read(sp.ref, 1)
+function Base.read(sp::SerialPort, readType::Type{Char}; nonBlocking=false, timeout=0)
+    if nonBlocking
+        nbytes_read, bytes = sp_nonblocking_read(sp.ref, 1)
+    else
+        nbytes_read, bytes = sp_blocking_read(sp.ref, 1, timeout)
+    end
+
     return (nbytes_read == 1) ? convert(readType,bytes[1]) : readType(0)
 end
 
-function Base.read(sp::SerialPort, readType::Type{UInt8})
-    nbytes_read, bytes = sp_nonblocking_read(sp.ref, 1)
+function Base.read(sp::SerialPort, readType::Type{UInt8}; nonBlocking=false, timeout=0)
+    if nonBlocking
+        nbytes_read, bytes = sp_nonblocking_read(sp.ref, 1)
+    else
+        nbytes_read, bytes = sp_blocking_read(sp.ref, 1, timeout)
+    end
+
     return (nbytes_read == 1) ? convert(readType,bytes[1]) : readType(0)
 end
 
