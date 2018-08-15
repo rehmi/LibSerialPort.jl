@@ -1,0 +1,6 @@
+authors = ["Rehmi Post <rehmi.post@gmail.com>"]
+name = "LibSerialPort"
+uuid = "d9b8e1ca-a0b8-11e8-0e65-893722676106"
+version = "0.1.0"
+
+[deps]
