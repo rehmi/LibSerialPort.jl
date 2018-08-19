@@ -1,6 +1,8 @@
-authors = ["Rehmi Post <rehmi.post@gmail.com>"]
 name = "LibSerialPort"
 uuid = "d9b8e1ca-a0b8-11e8-0e65-893722676106"
+authors = ["Rehmi Post <rehmi.post@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+BinDeps = "9e28174c-4ba2-5203-b857-d8d62c4213ee"
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
