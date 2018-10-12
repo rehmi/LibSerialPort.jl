@@ -423,6 +423,7 @@ function Base.readbytes!(sp::SerialPort, nbytes::Integer)
     return bytes
 end
 
+if false
 """
 `readstring(sp::SerialPort)`
 
@@ -436,4 +437,5 @@ function Base.readstring(sp::SerialPort)
         push!(result, byte)
     end
     return String(join(result))
+end
 end
