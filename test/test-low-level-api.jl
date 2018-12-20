@@ -30,8 +30,18 @@ function test_change_port_copy_method1(port::LibSerialPort.Port)
 
     # Request to send / clear to send go as a pair.
     # They must be enabled or disabled together.
-    sp_set_rts(port2, SP_RTS_OFF)
-    sp_set_cts(port2, SP_CTS_IGNORE)
+    # RTS and CTS not supported by all host systems, hence the try/catch.
+    try
+        sp_set_rts(port2, SP_RTS_OFF)
+    catch e
+        println("NOTE: skipped set_rts - $e")
+    end
+
+    try
+        sp_set_cts(port2, SP_CTS_IGNORE)
+    catch e
+        println("NOTE: skipped set_cts - $e")
+    end
 
     sp_set_dtr(port2, SP_DTR_OFF)
     sp_set_dsr(port2, SP_DSR_IGNORE)
@@ -76,7 +86,13 @@ function test_change_port_copy_method2(port::LibSerialPort.Port)
     sp_set_config_dsr(config2, SP_DSR_IGNORE)
     sp_set_config_xon_xoff(config2, SP_XONXOFF_INOUT)
 
-    sp_set_config(port2, config2)
+    # sp_set_config(port2, config2)
+    try
+        sp_set_config(port2, config2)
+    catch e
+        println("NOTE: skipped sp_set_config - $e")
+    end
+
     sp_free_config(config2)
 
     print("[TEST2] UPDATED ")
@@ -126,20 +142,22 @@ function test_blocking_serial_loopback(port::LibSerialPort.Port,
     sp_drain(port)
     sp_flush(port, SP_BUF_BOTH)
 
-    tic()
-    for i = 1:100
-        sp_blocking_write(port, Array{UInt8}("Test message $i\n"), write_timeout_ms)
-        sp_drain(port)
-        sp_flush(port, SP_BUF_OUTPUT)
-        nbytes_read, bytes = sp_blocking_read(port, 128, 50)
-        println("($i) nbytes_read: $nbytes_read")
-        if nbytes_read > 0
-            data = String(bytes)
-            println(data)
+    function loop()
+        for i = 1:100
+            sp_blocking_write(port, "Test message $i\n", write_timeout_ms)
+            sp_drain(port)
+            sp_flush(port, SP_BUF_OUTPUT)
+            nbytes_read, bytes = sp_blocking_read(port, 128, 50)
+            println("($i) nbytes_read: $nbytes_read")
+            if nbytes_read > 0
+                data = String(bytes)
+                println(data)
+            end
+            sp_flush(port, SP_BUF_INPUT)
         end
-        sp_flush(port, SP_BUF_INPUT)
     end
-    toc()
+
+    @time loop()
 end
 
 function test_nonblocking_serial_loopback(port::LibSerialPort.Port)
@@ -155,23 +173,26 @@ function test_nonblocking_serial_loopback(port::LibSerialPort.Port)
 
     print("\n\n[TEST] Serial loopback - ")
     println("Send 100 short messages and read whatever comes back...")
-    tic()
-    for i = 1:100
-        sp_nonblocking_write(port, Array{UInt8}("Test message $i\n"))
-        sp_drain(port)
-        nbytes_read, bytes = sp_nonblocking_read(port, 256)
-        print(String(bytes))
+
+    function loops()
+        for i = 1:100
+            sp_nonblocking_write(port, "Test message $i\n")
+            sp_drain(port)
+            nbytes_read, bytes = sp_nonblocking_read(port, 256)
+            print(String(bytes))
+        end
+
+        # Read and print any remaining data for ~50 ms
+        for i = 1:50
+            nbytes_read, bytes = sp_nonblocking_read(port, 256)
+            print(String(bytes))
+            sleep(0.001)
+        end
+
+        sp_flush(port, SP_BUF_BOTH)
     end
 
-    # Read and print any remaining data for ~50 ms
-    for i = 1:50
-        nbytes_read, bytes = sp_nonblocking_read(port, 256)
-        print(String(bytes))
-        sleep(0.001)
-    end
-
-    sp_flush(port, SP_BUF_BOTH)
-    toc()
+    @time loops()
 end
 
 """
@@ -181,9 +202,9 @@ and one stop bit. The baud rate is overridden on the command line with a
 second argument. Hardware and software flow control measures are disabled by
 default.
 """
-function main()
+function test_low_level_api(args...)
 
-    nargs = length(ARGS)
+    nargs = length(args)
     if nargs == 0
         println("Usage: $(basename(@__FILE__)) port [baudrate]")
         println("Available ports:")
@@ -191,8 +212,8 @@ function main()
         return
     end
 
-    port = sp_get_port_by_name(ARGS[1]) # e.g. "/dev/cu.wchusbserial1410"
-    baudrate = nargs >= 2 ? parse(Int, ARGS[2]) : 9600
+    port = sp_get_port_by_name(args[1]) # e.g. "/dev/cu.wchusbserial1410"
+    baudrate = nargs >= 2 ? parse(Int, args[2]) : 9600
 
     print_version()
     list_ports()
@@ -212,4 +233,4 @@ function main()
     sp_free_port(port)
 end
 
-main()
+test_low_level_api(ARGS...)

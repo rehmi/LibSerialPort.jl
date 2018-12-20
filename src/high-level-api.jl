@@ -425,12 +425,12 @@ end
 
 if false
 """
-`readstring(sp::SerialPort)`
+`read(sp::SerialPort, ::Type{String})`
 
 Read everything from the specified serial ports `sp` input buffer, one byte at
 a time, until it is empty. Returns a `String`.
 """
-function Base.readstring(sp::SerialPort)
+function Base.read(sp::SerialPort, ::Type{String})
     result = Char[]
     while Int(bytesavailable(sp)) > 0
         byte = readbytes!(sp, 1)[1]

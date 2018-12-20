@@ -1,11 +1,12 @@
 
 using LibSerialPort
 
+
 function test_nonblocking_serial_loopback(sp::SerialPort)
 
     println("\n[TEST] Read any incoming data for ~1 second...")
     for i = 1:1000
-        print(readstring(sp))
+        print(read(sp, String))
         sleep(0.001)
     end
     println()
@@ -17,13 +18,13 @@ function test_nonblocking_serial_loopback(sp::SerialPort)
 
     for i = 1:100
         write(sp, "Test message $i\n")
-        print(readstring(sp))
+        print(read(sp, String))
         i == 100 && write(sp, "done")
     end
 
     # Allow up to 100 more ms to get the remaining data
     for i = 1:100
-        data = readstring(sp)
+        data = read(sp, String)
         print(data)
         if occursin(data, "done")
             break
@@ -40,7 +41,7 @@ function test_readline(sp::SerialPort)
 
     println("\n[TEST] Read any incoming data for ~1 second...")
     for i = 1:1000
-        print(readstring(sp))
+        print(read(sp, String))
         sleep(0.001)
     end
     println()
@@ -66,16 +67,16 @@ function test_readline(sp::SerialPort)
     flush(sp, buffer=SP_BUF_BOTH)
 end
 
-function main()
+function test_high_level_api(args...)
 
-    if length(ARGS) != 2
+    if length(args) != 2
         println("Usage: $(basename(@__FILE__)) port baudrate")
         println("Available ports:")
         list_ports()
         return
     end
 
-    sp = open(ARGS[1], parse(Int, ARGS[2]))
+    sp = open(args[1], parse(Int, args[2]))
 
     print_port_metadata(sp)
     print_port_settings(sp)
@@ -86,4 +87,4 @@ function main()
     close(sp)
 end
 
-main()
+test_high_level_api(ARGS...)
