@@ -123,7 +123,8 @@ function handle_error(ret::SPReturn, location::AbstractString)
     elseif ret == SP_ERR_FAIL
         # Note: these functions only return valid info after SP_ERR_FAIL
         # Don't use them elsewhere
-        println("OS error code $(sp_last_error_code()): $(sp_last_error_message())")
+        # printing the error is fine for debugging but otherwise most uncool
+        # println("OS error code $(sp_last_error_code()): $(sp_last_error_message())")
         msg *= "Host OS reported a failure."
     elseif ret == SP_ERR_MEM
         msg *= "Memory allocation failed."
