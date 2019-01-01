@@ -137,8 +137,8 @@ function handle_error(ret::SPReturn, location::AbstractString)
     error(msg)
 end
 
-macro loc()
-    return "$(eval(@__FILE__)):$(eval(@__LINE__))"
+macro loc
+    return :(string(@__FILE__, ":", @__LINE__))
 end
 
 # enum sp_return sp_get_port_by_name(const char *portname, struct sp_port **port_ptr);
