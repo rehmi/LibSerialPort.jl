@@ -5,8 +5,14 @@ mutable struct SerialPort <: IO
     open::Bool
     function SerialPort(ref, eof, open)
         sp = new(ref, eof, open)
-        finalizer(destroy!, sp)
+        finalizer(quietdestroy!, sp)
         return sp
+    end
+    function quietdestroy!(sp::SerialPort)
+        try
+            destroy!(sp)
+        catch err
+        end
     end
 end
 
@@ -249,7 +255,6 @@ function Base.close(sp::SerialPort)
     if sp.open
         # Flush first, as is done in other close() methods in Base
         sp_flush(sp.ref, SP_BUF_BOTH)
-
         sp_close(sp.ref)
         sp.open = false
     end
