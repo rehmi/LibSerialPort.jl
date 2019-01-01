@@ -137,6 +137,7 @@ function handle_error(ret::SPReturn, location::AbstractString)
     error(msg)
 end
 
+
 macro loc()
     return :(string(@__FILE__, ":", @__LINE__))
 end
