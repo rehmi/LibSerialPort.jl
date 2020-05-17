@@ -1,12 +1,6 @@
 name = "LibSerialPort"
 uuid = "d9b8e1ca-a0b8-11e8-0e65-893722676106"
 authors = ["Rehmi Post <rehmi.post@gmail.com>"]
-version = "0.3.0"
-
-[deps]
-BinDeps = "9e28174c-4ba2-5203-b857-d8d62c4213ee"
-Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
-uuid = "a05a14c7-6e3b-5ba9-90a2-45558833e1df"
 version = "0.4.0"
 
 [deps]

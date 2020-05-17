@@ -116,7 +116,11 @@ SPTransport(x::SPTransport) = SPTransport(Int(x))
 function handle_error(ret::SPReturn)
     ret >= SP_OK && return ret
 
-    msg = "libserialport returned $ret - "
+    trace = stacktrace()
+    caller = trace[2]
+
+
+    msg = "libserialport: $caller => $ret - "
 
     if ret == SP_ERR_ARG
         msg *= "Function was called with invalid arguments."
