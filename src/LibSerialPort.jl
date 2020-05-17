@@ -1,6 +1,9 @@
 
 module LibSerialPort
 
+using Libdl
+using libserialport_jll
+
 export
     # Enum types
     SPReturn,
@@ -164,6 +167,7 @@ export
 
     # Functions from high-level API
     list_ports,
+    get_port_list,
     print_port_metadata,
     print_port_settings,
     set_speed,
@@ -172,23 +176,8 @@ export
     seteof,
     reseteof
 
-const depsdir = joinpath(dirname(dirname(@__FILE__)), "deps")
-const depsfile = joinpath(depsdir, "deps.jl")
-if isfile(depsfile)
-    include(depsfile)
-
-    # This is supposed to address runtime linking problems.
-    # Exporting environment variables like (DY)LD_LIBRARY_PATH works,
-    # but this is a more self-contained and portable solution.
-    libdir = joinpath(depsdir, "usr/lib")
-    if !in(libdir, DL_LOAD_PATH)
-        push!(DL_LOAD_PATH, libdir)
-    end
-else
-    error("LibSerialPort not properly installed. Please run Pkg.build(\"LibSerialPort\")")
-end
-
 include("wrap.jl")
 include("high-level-api.jl")
+include("utils.jl")
 
 end # LibSerialPort

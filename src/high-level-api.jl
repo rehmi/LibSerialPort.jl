@@ -1,3 +1,5 @@
+import Base: open, close, write, unsafe_write, flush,
+    read, unsafe_read, readbytes!, readuntil, bytesavailable, eof
 
 mutable struct SerialPort <: IO
     ref::Port
@@ -36,8 +38,8 @@ end
 """
 `set_speed(sp::SerialPort,bps::Integer)`
 
-Set connection speed of `sp` in bits per second. The library will return an
-error if bps is not a valid/supported value.
+Set connection speed of `sp` in bits per second. Raise an
+`ErrorException` if `bps` is not a valid/supported value.
 """
 function set_speed(sp::SerialPort, bps::Integer)
      sp_set_baudrate(sp.ref, bps)
@@ -45,7 +47,7 @@ function set_speed(sp::SerialPort, bps::Integer)
 end
 
 """
-`set_frame(sp::SerialPort [, ndatabits::Integer, pariry::SPParity, nstopbits::Integer])`
+`set_frame(sp::SerialPort [, ndatabits::Integer, parity::SPParity, nstopbits::Integer])`
 
 Configure packet framing. Defaults to the most common "8N1" scheme. See
 https://en.wikipedia.org/wiki/Universal_asynchronous_receiver/transmitter#Data_framing
@@ -131,6 +133,23 @@ function list_ports(;nports_guess::Integer=64)
     return nothing
 end
 
+"""
+`get_port_list([nports_guess::Integer])`
+
+Return a vector of currently visible ports.
+
+`nports_guess` provides the number of ports guessed. Its default is `64`.
+"""
+function get_port_list(;nports_guess::Integer=64)
+    ports = sp_list_ports()
+    port_list = String[]
+    for port in unsafe_wrap(Array, ports, nports_guess, own=false)
+        port == C_NULL && return port_list
+        push!(port_list, sp_get_port_name(port))
+    end
+    sp_free_port_list(ports)
+    return port_list
+end
 
 """
 `print_port_metadata(sp::SerialPort [,show_config::Bool])
@@ -147,23 +166,27 @@ end
 
 function print_port_metadata(port::LibSerialPort.Port; show_config::Bool=true)
     println("\nPort name:\t",       sp_get_port_name(port))
-    println("Manufacturer:\t",      sp_get_port_usb_manufacturer(port))
-    println("Product:\t",           sp_get_port_usb_product(port))
-    println("USB serial number:\t", sp_get_port_usb_serial(port))
-    println("Bluetooth address:\t", sp_get_port_bluetooth_address(port))
+    transport = sp_get_port_transport(port)
+    print("\nPort transport:\t");
+    if transport == SP_TRANSPORT_NATIVE
+        println("native serial port")
+    elseif transport == SP_TRANSPORT_USB
+        println("USB")
+        println("Manufacturer:\t",      sp_get_port_usb_manufacturer(port))
+        println("Product:\t",           sp_get_port_usb_product(port))
+        println("USB serial number:\t", sp_get_port_usb_serial(port))
+        bus, addr = sp_get_port_usb_bus_address(port)
+        println("USB bus #:\t", bus)
+        println("Address on bus:\t", addr)
+        vid, pid = sp_get_port_usb_vid_pid(port)
+        println("Vendor ID:\t", vid)
+        println("Product ID:\t", pid)
+    elseif transport == SP_TRANSPORT_BLUETOOTH
+        println("Bluetooth")
+        println("Bluetooth address:\t", sp_get_port_bluetooth_address(port))
+    end
     println("File descriptor:\t",   sp_get_port_handle(port))
 
-    bus, addr = sp_get_port_usb_bus_address(port)
-    if bus != -1
-        println("USB bus #:\t",   bus)
-        println("Address on bus:\t",  addr)
-    end
-
-    vid, pid = sp_get_port_usb_vid_pid(port)
-    if vid != -1
-        println("Vendor ID:\t",   vid)
-        println("Product ID:\t",  pid)
-    end
     if show_config
         print_port_settings(port)
     end
@@ -253,74 +276,33 @@ Close the serial port `sp`.
 """
 function Base.close(sp::SerialPort)
     if sp.open
-        # Flush first, as is done in other close() methods in Base
-        sp_flush(sp.ref, SP_BUF_BOTH)
         sp_close(sp.ref)
         sp.open = false
     end
     return sp
 end
 
-"""
-`flush(sp::SerialPort [, buffer::SPBuffer])`
+# fixes https://github.com/JuliaIO/LibSerialPort.jl/issues/53
+@deprecate flush(sp::SerialPort, buffer::SPBuffer=SP_BUF_BOTH) sp_flush(sp, buffer)
 
-Flush `buffer` of serial port `sp`.
+# pass through some methods from the low-level interface
+sp_output_waiting(sp::SerialPort) = sp_output_waiting(sp.ref)
+sp_flush(sp::SerialPort, args...) = sp_flush(sp.ref, args...)
+sp_drain(sp::SerialPort)          = sp_drain(sp.ref)
 
-`buffer` can take the values: `SP_BUF_INPUT`, `SP_BUF_OUTPUT`, and
-`SP_BUF_BOTH`.
-"""
-function Base.flush(sp::SerialPort; buffer::SPBuffer=SP_BUF_BOTH)
-    sp_flush(sp.ref, buffer)
+# We define here only the basic methods for writing bytes.
+# All other write() methods for writing the canonical binary
+# representation of any type, and print() methods for writing
+# its text representation, are inherited from the IO supertype
+# (see julia/base/io.jl), i.e. work just like for files.
+
+function write(sp::SerialPort, b::UInt8)
+    Int(sp_blocking_write(sp.ref, Ref(b)))
 end
 
-"""
-`write(sp::SerialPort, data::String)`
-`write(sp::SerialPort, data::Array{Char})`
-`write(sp::SerialPort, data::Array{UInt8})`
-
-Write sequence of Bytes to `sp`.
-"""
-function Base.write(sp::SerialPort, data::Array{UInt8})
-    sp_nonblocking_write(sp.ref, data)
-    return sp_drain(sp.ref)
+function unsafe_write(sp::SerialPort, p::Ptr{UInt8}, nb::UInt)
+    Int(sp_blocking_write(sp.ref, p, nb))
 end
-
-function Base.write(sp::SerialPort, data::Array{Char})
-    sp_nonblocking_write(sp.ref, data)
-    return sp_drain(sp.ref)
-end
-
-function Base.write(sp::SerialPort, data::String)
-    # sp_nonblocking_write(sp.ref, convert(Array{UInt8},data))
-    sp_nonblocking_write(sp.ref, data)
-    return sp_drain(sp.ref)
-end
-
-"""
-`write(sp::SerialPort, data::UInt8)`
-`write(sp::SerialPort, data::Char)`
-
-Write single Byte to `sp`
-"""
-Base.write(sp::SerialPort, data::Char) = write(sp, [data])
-Base.write(sp::SerialPort, data::UInt8) = write(sp, [data])
-
-"""
-`write(sp::SerialPort, i::Integer)`
-
-Write string representation of `i` to `sp`.
-"""
-Base.write(sp::SerialPort, i::Integer) = Base.write(sp, "$i")
-
-"""
-`write(sp::SerialPort, f::AbstractFloat)`
-`write(sp::SerialPort, f::AbstractFloat, format::AbstractString)`
-
-Write formatted string representation of `f` to `sp`. By default the string is
-formated using `format="%.3f"`. For details on the format consult the
-documentation of the C library function `sprintf`.
-"""
-Base.write(sp::SerialPort, f::AbstractFloat, format::AbstractString="%.3f") = Base.write(sp, eval(:@sprintf($format, $f)))
 
 """
 `eof(sp::SerialPort)`
@@ -340,7 +322,7 @@ function seteof(sp::SerialPort, state::Bool)
 end
 
 """
-`seteof(sp::SerialPort, state::Bool)`
+`reseteof(sp::SerialPort, state::Bool)`
 
 Reset EOF of `sp` to `false`
 """
